@@ -1,0 +1,365 @@
+openapi: 3.1.0
+info:
+  title: KABU Relay API
+  version: v1
+  description: |
+    Read-only relay API for kabu station board collection.
+    Observation-only. No order endpoints.
+    Active universe must stay within kabu API's combined REST/PUSH registration cap of 50 symbols.
+servers:
+  - url: http://192.168.0.20:18081
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    Symbol:
+      type: object
+      required: [api_symbol, symbol, exchange, name, bucket]
+      properties:
+        api_symbol: { type: string, example: '4582@3' }
+        symbol: { type: string, example: '4582' }
+        exchange: { type: integer, example: 3 }
+        name: { type: string, example: 'シンバイオ製薬' }
+        bucket: { type: string, example: 'tier1' }
+    BoardLevel:
+      type: object
+      required: [level, price, qty]
+      properties:
+        level: { type: integer, example: 1 }
+        price: { type: number, nullable: true, example: 500.0 }
+        qty: { type: number, nullable: true, example: 200 }
+    LatestSnapshot:
+      type: object
+      required:
+        - api_symbol
+        - symbol
+        - exchange
+        - symbol_name
+        - bucket
+        - collected_at_utc
+        - source
+        - stale
+      properties:
+        api_symbol: { type: string, example: '4582@3' }
+        symbol: { type: string, example: '4582' }
+        exchange: { type: integer, example: 3 }
+        symbol_name: { type: string, example: 'シンバイオ製薬' }
+        bucket: { type: string, example: 'tier1' }
+        collected_at_utc: { type: string, format: date-time }
+        source_current_price_time: { type: string, nullable: true, example: '2026-04-27T09:00:04+09:00' }
+        current_price: { type: number, nullable: true }
+        trading_volume: { type: number, nullable: true }
+        vwap: { type: number, nullable: true }
+        best_bid_price: { type: number, nullable: true }
+        best_bid_qty: { type: number, nullable: true }
+        best_ask_price: { type: number, nullable: true }
+        best_ask_qty: { type: number, nullable: true }
+        mid_price: { type: number, nullable: true }
+        spread: { type: number, nullable: true }
+        spread_pct: { type: number, nullable: true }
+        bid_depth_5_jpy: { type: number, nullable: true }
+        ask_depth_5_jpy: { type: number, nullable: true }
+        bids:
+          type: array
+          items: { $ref: '#/components/schemas/BoardLevel' }
+        asks:
+          type: array
+          items: { $ref: '#/components/schemas/BoardLevel' }
+        source: { type: string, example: 'kabu_board_poll' }
+        freshness_ms: { type: integer, nullable: true, example: 850 }
+        stale: { type: boolean }
+    SnapshotHistoryRow:
+      type: object
+      required: [id, collected_at_utc]
+      properties:
+        id: { type: integer, example: 123 }
+        collected_at_utc: { type: string, format: date-time }
+        best_bid_price: { type: number, nullable: true }
+        best_bid_qty: { type: number, nullable: true }
+        best_ask_price: { type: number, nullable: true }
+        best_ask_qty: { type: number, nullable: true }
+        spread_pct: { type: number, nullable: true }
+        trading_volume: { type: number, nullable: true }
+        current_price: { type: number, nullable: true }
+    PriceChangeRow:
+      type: object
+      required: [id, detected_at_utc, symbol, change_type]
+      properties:
+        id: { type: integer }
+        detected_at_utc: { type: string, format: date-time }
+        symbol: { type: string }
+        change_type: { type: string, example: 'best_quote_changed' }
+        prev_best_bid: { type: number, nullable: true }
+        prev_best_ask: { type: number, nullable: true }
+        new_best_bid: { type: number, nullable: true }
+        new_best_ask: { type: number, nullable: true }
+        prev_spread_pct: { type: number, nullable: true }
+        new_spread_pct: { type: number, nullable: true }
+        best_bid_duration_sec: { type: number, nullable: true }
+        best_ask_duration_sec: { type: number, nullable: true }
+    StatusResponse:
+      type: object
+      required: [ok, server_time_utc, collector, kabu, storage]
+      properties:
+        ok: { type: boolean }
+        server_time_utc: { type: string, format: date-time }
+        collector:
+          type: object
+          required: [running, mode, poll_interval_seconds, configured_symbol_count]
+          properties:
+            running: { type: boolean }
+            mode: { type: string, example: 'poll' }
+            poll_interval_seconds: { type: number, example: 5 }
+            configured_symbol_count: { type: integer, example: 7 }
+            last_success_at_utc: { type: string, format: date-time, nullable: true }
+            last_error_at_utc: { type: string, format: date-time, nullable: true }
+            consecutive_error_count: { type: integer, example: 0 }
+            lag_seconds: { type: number, nullable: true }
+            market_session: { type: string, nullable: true, example: 'morning' }
+            market_open: { type: boolean }
+        kabu:
+          type: object
+          required: [reachable, host, port, token_status]
+          properties:
+            reachable: { type: boolean }
+            host: { type: string, example: '127.0.0.1' }
+            port: { type: integer, example: 18080 }
+            token_status: { type: string, example: 'valid' }
+            token_last_refreshed_at_utc: { type: string, format: date-time, nullable: true }
+        storage:
+          type: object
+          required: [db_path]
+          properties:
+            db_path: { type: string }
+            latest_snapshot_at_utc: { type: string, format: date-time, nullable: true }
+            snapshot_rows: { type: integer, nullable: true }
+            price_change_rows: { type: integer, nullable: true }
+paths:
+  /health:
+    get:
+      security: []
+      summary: Health check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
+                  service: { type: string }
+                  version: { type: string }
+  /v1/status:
+    get:
+      summary: Collector and upstream status
+      responses:
+        '200':
+          description: Status response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/symbols:
+    get:
+      summary: Configured symbols
+      parameters:
+        - in: query
+          name: bucket
+          required: false
+          schema:
+            type: string
+            enum: [tier1, tier2, controls]
+      responses:
+        '200':
+          description: Symbol list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  symbols:
+                    type: array
+                    items: { $ref: '#/components/schemas/Symbol' }
+  /v1/boards:
+    get:
+      summary: Latest snapshots for multiple symbols
+      parameters:
+        - in: query
+          name: symbols
+          required: false
+          schema:
+            type: string
+            example: '4582@3,7078@3,9325@2'
+      responses:
+        '200':
+          description: Latest snapshots
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  snapshots:
+                    type: array
+                    items: { $ref: '#/components/schemas/LatestSnapshot' }
+  /v1/boards/{api_symbol}:
+    get:
+      summary: Latest snapshot for one symbol
+      parameters:
+        - in: path
+          name: api_symbol
+          required: true
+          schema: { type: string, example: '4582@3' }
+      responses:
+        '200':
+          description: One latest snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LatestSnapshot'
+        '404':
+          description: Symbol not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /v1/snapshots:
+    get:
+      summary: Historical snapshots
+      parameters:
+        - in: query
+          name: symbol
+          required: true
+          schema: { type: string, example: '4582@3' }
+        - in: query
+          name: from
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, default: 500, maximum: 5000 }
+        - in: query
+          name: cursor
+          required: false
+          schema: { type: string }
+        - in: query
+          name: order
+          required: false
+          schema: { type: string, enum: [asc, desc], default: desc }
+      responses:
+        '200':
+          description: Snapshot history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  symbol: { type: string }
+                  count: { type: integer }
+                  next_cursor: { type: string, nullable: true }
+                  rows:
+                    type: array
+                    items: { $ref: '#/components/schemas/SnapshotHistoryRow' }
+  /v1/price-changes:
+    get:
+      summary: Quote change history
+      parameters:
+        - in: query
+          name: symbol
+          required: true
+          schema: { type: string, example: '4582' }
+        - in: query
+          name: from
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: to
+          required: false
+          schema: { type: string, format: date-time }
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, default: 500, maximum: 5000 }
+      responses:
+        '200':
+          description: Price change history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count: { type: integer }
+                  rows:
+                    type: array
+                    items: { $ref: '#/components/schemas/PriceChangeRow' }
+  /v1/export/meta:
+    get:
+      summary: Latest export metadata
+      responses:
+        '200':
+          description: Export metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latest_export:
+                    type: object
+                    nullable: true
+                    properties:
+                      created_at_utc: { type: string, format: date-time }
+                      file_name: { type: string }
+                      file_size_bytes: { type: integer }
+                      snapshot_rows: { type: integer }
+                      price_change_rows: { type: integer }
+                      latest_snapshot_at_utc: { type: string, format: date-time, nullable: true }
+  /v1/export/sqlite/latest:
+    get:
+      summary: Download latest frozen SQLite snapshot
+      responses:
+        '200':
+          description: SQLite file
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '409':
+          description: Export busy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '503':
+          description: Collector not ready or upstream unavailable
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
