@@ -1,0 +1,56 @@
+{
+  "service": {
+    "name": "kabu-relay",
+    "version": "v1"
+  },
+  "server": {
+    "listen_host": "0.0.0.0",
+    "listen_port": 18091,
+    "bearer_token_env": "KABU_RELAY_BEARER_TOKEN",
+    "allowed_subnets": [
+      "127.0.0.1/32",
+      "192.168.0.0/24"
+    ]
+  },
+  "kabu": {
+    "host": "localhost",
+    "port": 18080,
+    "api_password_env": "KABU_API_PASSWORD",
+    "token_refresh": {
+      "on_start": true,
+      "on_401_retry_once": true,
+      "daily_refresh_jst": "08:55:00"
+    }
+  },
+  "collection": {
+    "mode": "poll",
+    "poll_interval_seconds": 5,
+    "business_days_only": true,
+    "timezone": "Asia/Tokyo",
+    "sessions": [
+      {"name": "morning",   "start": "09:00:00", "end": "11:30:00"},
+      {"name": "afternoon", "start": "12:30:00", "end": "15:30:00"}
+    ],
+    "stale_threshold_seconds": 60,
+    "_comment_extra_closed_dates": "Weekends and JP national holidays are skipped automatically (jpholiday). List the non-holiday TSE closures here: 12/31 大晦日, 1/2-1/3 新年休場. 1/1 元日 is already a national holiday so omit it. Update yearly.",
+    "extra_closed_dates": [
+      "2026-12-31",
+      "2027-01-02",
+      "2027-01-03"
+    ]
+  },
+  "storage": {
+    "db_path": "./data/kabu_orderbook.db",
+    "export_dir": "./exports",
+    "keep_exports": 10
+  },
+  "symbols": [
+    {"api_symbol": "4582@3", "symbol": "4582", "exchange": 3, "name": "シンバイオ製薬", "bucket": "tier1"},
+    {"api_symbol": "7078@3", "symbol": "7078", "exchange": 3, "name": "INCLUSIVE", "bucket": "tier1"},
+    {"api_symbol": "9325@2", "symbol": "9325", "exchange": 2, "name": "ファイズHD", "bucket": "tier1"},
+    {"api_symbol": "4015@3", "symbol": "4015", "exchange": 3, "name": "アララ", "bucket": "tier1"},
+    {"api_symbol": "3969@2", "symbol": "3969", "exchange": 2, "name": "エイトレッド", "bucket": "tier1"},
+    {"api_symbol": "3468@2", "symbol": "3468", "exchange": 2, "name": "スターアジア不動産投資法人", "bucket": "controls"},
+    {"api_symbol": "1629@1", "symbol": "1629", "exchange": 1, "name": "商社・卸売ETF", "bucket": "controls"}
+  ]
+}
